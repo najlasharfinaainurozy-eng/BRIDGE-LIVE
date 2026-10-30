@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jembatan: Memahami SFD, BMD &amp; NFD</title>
+<style>
+:root{--sky:linear-gradient(180deg,#bfe0fa 0%,#dcedfc 55%,#f1f8ff 100%);--bg:#dbeafe;--card:rgba(255,252,247,.92);--fg:#2b2a33;--muted:#667080;--line:#cdd9e6;--v:#2563eb;--m:#dc2626;--n:#16a34a;--acc:#b8603e;--accfg:#fff;--cloud:rgba(255,255,255,.8);
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sky:linear-gradient(180deg,#0e1a2c,#172a42);--bg:#0e1a2c;--card:rgba(34,40,56,.92);--fg:#f1ebe3;--muted:#a3adbd;--line:#34445e;--v:#60a5fa;--m:#f87171;--n:#4ade80;--acc:#e8a07f;--accfg:#1c1a1f;--cloud:rgba(255,255,255,.07)}}
+:root[data-theme="dark"]{--sky:linear-gradient(180deg,#0e1a2c,#172a42);--bg:#0e1a2c;--card:rgba(34,40,56,.92);--fg:#f1ebe3;--muted:#a3adbd;--line:#34445e;--v:#60a5fa;--m:#f87171;--n:#4ade80;--acc:#e8a07f;--accfg:#1c1a1f;--cloud:rgba(255,255,255,.07)}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--sky) fixed;color:var(--fg);font:16px/1.6 "Gill Sans","Seravek","Candara","Trebuchet MS",system-ui,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:22px 16px 44px}
+h1{font:600 1.7rem/1.25 Georgia,"Iowan Old Style",serif;margin:0 0 4px}
+p.sub{margin:0 0 16px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 6px 22px rgba(60,80,120,.1)}
+canvas{width:100%;display:block}
+.ctrl{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 20px;margin-top:14px}
+label{display:flex;flex-direction:column;font-size:.88rem;color:var(--muted);gap:2px}
+label b{color:var(--fg);font-weight:600}
+input[type=range]{width:100%;accent-color:var(--acc)}
+input[type=number]{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);width:100%;margin-top:4px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+button{background:var(--acc);color:var(--accfg);border:0;border-radius:999px;padding:8px 18px;font:inherit;cursor:pointer}
+.chip{background:var(--card);color:var(--fg);border:1px solid var(--line);padding:6px 13px;font-size:.92rem}
+.chip.on{background:var(--acc);color:var(--accfg);border-color:var(--acc)}
+.chk{flex-direction:row;align-items:center;gap:6px}
+.story{margin-top:14px;border-left:4px solid var(--acc)}
+.story h2,summary{font:600 1.05rem Georgia,serif}
+.story p{margin:4px 0 0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.stat{border:1px solid var(--line);border-radius:14px;padding:8px 12px;background:var(--card)}
+.stat small{color:var(--muted);display:block}
+.stat span{font-size:1.15rem;font-weight:600}
+details{margin-top:14px}
+details p{margin:6px 0 0}
+.rw{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:8px}.rw>*{flex:1 1 130px}.rw .chip{flex:0 0 auto}.rw .chip:disabled{opacity:.35;cursor:default}
+select{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg)}
+#edcard h2{font:600 1.05rem Georgia,serif;margin:0}#edcard p{margin:2px 0 4px;color:var(--muted);font-size:.9rem}
+.note{font-size:.84rem;color:var(--muted);margin-top:14px}
+</style>
+</head>
+<body>
+<main>
+<h1>Bagaimana jembatan “merasakan” beban?</h1>
+<p class="sub">Halo! Bayangkan jembatan sebagai balok yang menopang kita. Pilih siapa yang lewat, atur panjang bentang dan bebannya, lalu lihat gaya-gaya di dalam jembatan berubah.</p>
+
+<div class="card"><canvas id="cv"></canvas></div>
+<div class="row" id="veh"></div>
+<div class="row">
+  <button id="play">⏸ Jeda</button>
+  <label class="chk"><input type="checkbox" id="env" checked> Tampilkan envelope (batas maks/min)</label>
+  <button class="chip" id="mixb">🚦 Preset arus campuran</button>
+</div>
+
+<div class="ctrl">
+  <label>Panjang bentang: <b id="lv"></b><input type="range" id="L" min="6" max="60" step="1" value="20"></label>
+  
+  
+  
+  <label>Posisi (depan): <b id="pv"></b><input type="range" id="pos" step="0.05"></label>
+  <label>Kecepatan: <b id="sv"></b><input type="range" id="spd" min="0.5" max="12" step="0.5" value="3"></label>
+  <label>Gaya rem (% beban): <b id="mv"></b><input type="range" id="mu" min="0" max="40" step="1" value="0"></label>
+</div>
+
+<div class="card" id="edcard" style="margin-top:14px"><h2>Atur bebanmu</h2><p>Setiap baris adalah satu beban yang lewat berurutan (baris paling atas berada paling depan). Ubah jenis, berat, dan jaraknya, atau tambah beban sebanyak yang kamu mau.</p><div id="rows"></div><div class="row"><select id="addsel" aria-label="Jenis beban"></select><button id="add">+ Tambah beban</button></div></div>
+
+<div class="card story"><h2>Cerita saat ini</h2><p id="story"></p></div>
+
+<div class="stats">
+  <div class="stat"><small>Geser maks (+)</small><span id="s1">–</span></div>
+  <div class="stat"><small>Geser min (−)</small><span id="s2">–</span></div>
+  <div class="stat"><small>Momen maks</small><span id="s3">–</span></div>
+  <div class="stat"><small>Gaya normal (tarik)</small><span id="s4">–</span></div>
+</div>
+
+<details class="card"><summary>Apa itu SFD, BMD, dan NFD?</summary>
+<p><b>SFD</b> (gaya geser): seberapa kuat jembatan “digunting” di setiap titik oleh beban dan tumpuan.</p>
+<p><b>BMD</b> (momen lentur): seberapa besar jembatan ingin melengkung. Makin besar, makin menuntut penampang yang kuat.</p>
+<p><b>NFD</b> (gaya normal): gaya yang menarik atau menekan sepanjang jembatan, misalnya saat kendaraan mengerem.</p></details>
+
+<p class="note">Beban dibagi ke tiap gandar menurut proporsi kendaraan (panah merah = beban gandar, kN). Jarak antar beban diukur dari ujung belakang beban di depan ke ujung depan beban di belakangnya (maksimal 10 beban). Gaya rem horizontal ditahan sendi A. Konvensi: geser positif di atas sumbu, momen positif digambar di sisi bawah (sisi tarik), N positif = tarik. Eksentrisitas gaya rem diabaikan.</p>
+</main>
+
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),$=id=>document.getElementById(id),FAM='"Gill Sans","Seravek","Candara","Trebuchet MS",system-ui,sans-serif';
+const VEH=[
+ {id:'ped',n:'🚶 Pejalan',w:.75,r:[.3,2],ax:[[0,1]],fo:.3,ro:.3,k:'ped',c:'#f472b6',h:1.7},
+ {id:'crowd',n:'👥 Kerumunan',w:5,r:[1,40],ax:[0,1,2,3,4,5].map(i=>[-.7*i,1/6]),fo:.3,ro:.3,k:'ped',c:'#f472b6',h:1.7},
+ {id:'bike',n:'🚲 Sepeda',w:.8,r:[.3,2],ax:[[0,.4],[-1.1,.6]],fo:.4,ro:.4,k:'bike',c:'#22c55e',h:1},
+ {id:'moto',n:'🏍️ Motor',w:2,r:[1,6],ax:[[0,.4],[-1.3,.6]],fo:.5,ro:.5,k:'bike',c:'#ef4444',h:1.2},
+ {id:'car',n:'🚗 Mobil',w:15,r:[8,40],ax:[[0,.5],[-2.7,.5]],fo:.9,ro:.9,k:'car',c:'#6366f1',h:1.6},
+ {id:'pick',n:'🛻 Pickup',w:30,r:[15,60],ax:[[0,.45],[-3,.55]],fo:1,ro:1.4,k:'cab',cab:1.8,c:'#0ea5e9',c2:'#0369a1',h:1.5},
+ {id:'bus',n:'🚌 Bus',w:150,r:[80,300],ax:[[0,.35],[-6,.65]],fo:1.5,ro:2.5,k:'win',c:'#facc15',h:3},
+ {id:'truck',n:'🚚 Truk',w:300,r:[100,600],ax:[[0,.4],[-4,.6]],fo:1,ro:1.5,k:'cab',cab:2,c:'#f59e0b',c2:'#d97706',h:2.6},
+ {id:'trail',n:'🚛 Trailer',w:450,r:[150,1000],ax:[[0,.2],[-3.5,.4],[-12,.4]],fo:1,ro:1.5,k:'cab',cab:2.5,c:'#64748b',c2:'#334155',h:2.8},
+ {id:'train',n:'🚆 Kereta',w:1200,r:[400,3000],ax:[[0,.25],[-2.5,.25],[-13,.25],[-15.5,.25]],fo:2,ro:2,k:'win',c:'#dc2626',h:3.2},
+ {id:'box',n:'📦 Beban titik',w:100,r:[10,1000],ax:[[0,1]],fo:.8,ro:.8,k:'box',c:'#7c3aed',h:1.6}
+];
+VEH.forEach(v=>v.mo=v.ax[v.ax.length-1][0]);
+const byId=Object.fromEntries(VEH.map(v=>[v.id,v])),MIX=['car','moto','bus','truck','pick','car','trail','bike'];
+const S={xf:-4,xmin:-4,xmax:40,playing:true,speed:3,mu:0,last:0};
+let rows=[{id:'truck',w:300,gap:8}];
+let L=20,V=byId.truck,items=[],env=null,sc={v:1,m:1,n:1};
+const G=201;let XS=[];
+
+function buildConvoy(keep){
+  items=[];
+  rows.forEach((r,i)=>{const v=byId[r.id];
+    let off=0;if(i){const p=items[i-1];off=p.off+p.v.mo-p.v.ro-r.gap-v.fo}
+    items.push({v,w:r.w,off})});
+  const a=items[0],z=items[items.length-1];
+  S.xmax=L+(a.v.fo-(z.off+z.v.mo-z.v.ro))+2;
+  S.xf=keep?Math.min(Math.max(S.xf,S.xmin),S.xmax):S.xmin;
+  const p=$('pos');p.min=S.xmin;p.max=S.xmax;p.value=S.xf;
+  XS=Array.from({length:G},(_,i)=>i*L/(G-1));
+  buildEnv();labels();
+}
+const loads=xf=>{const o=[];items.forEach(it=>it.v.ax.forEach(([a,f])=>{const x=xf+it.off+a;if(x>=0&&x<=L)o.push({x,P:f*it.w,it})}));return o};
+function sect(ls,s){
+  let RA=0;ls.forEach(l=>RA+=l.P*(L-l.x)/L);
+  let v=RA,m=RA*s,n=0;
+  ls.forEach(l=>{if(l.x<s){v-=l.P;m-=l.P*(s-l.x)}else n+=S.mu*l.P});
+  return [v,m,n];
+}
+function curve(ls){
+  const p=XS.slice();ls.forEach(l=>p.push(l.x-1e-6,l.x+1e-6));
+  return p.filter(x=>x>=0&&x<=L).sort((a,b)=>a-b).map(x=>({x,v:sect(ls,x)}));
+}
+function buildEnv(){
+  env={vmax:XS.map(()=>0),vmin:XS.map(()=>0),mmax:XS.map(()=>0),nmax:XS.map(()=>0)};
+  for(let xf=S.xmin;xf<=S.xmax;xf+=.25){
+    const ls=loads(xf);if(!ls.length)continue;
+    XS.forEach((s,i)=>{const [v,m,n]=sect(ls,s);
+      env.vmax[i]=Math.max(env.vmax[i],v);env.vmin[i]=Math.min(env.vmin[i],v);
+      env.mmax[i]=Math.max(env.mmax[i],m);env.nmax[i]=Math.max(env.nmax[i],n)});
+  }
+  sc={v:Math.max(1e-6,...env.vmax,...env.vmin.map(Math.abs)),m:Math.max(1e-6,...env.mmax),n:Math.max(1e-6,...env.nmax)};
+}
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let W=900,H=640;
+function resize(){
+  const r=cv.getBoundingClientRect(),d=window.devicePixelRatio||1;
+  W=r.width;H=Math.max(540,Math.min(700,W*.74));
+  cv.style.height=H+'px';cv.width=W*d;cv.height=H*d;ctx.setTransform(d,0,0,d,0,0);
+}
+
+function drawItem(it,sx,cw,deckY){
+  const v=it.v,k=Math.max(9,Math.min(cw*.9,26)),wr=Math.max(3,.42*k),xs=v.ax.map(a=>sx(S.xf+it.off+a[0]));
+  const left=Math.min(...xs)-v.ro*cw,right=sx(S.xf+it.off)+v.fo*cw;
+  if(right<0||left>W)return deckY-v.h*k;
+  const hh=v.h*k,bot=deckY-wr*1.1,top=bot-hh;
+  ctx.fillStyle=v.c;ctx.strokeStyle=v.c;
+  if(v.k==='ped'){
+    const ph=1.7*k;ctx.lineWidth=2;
+    xs.forEach(x=>{const hr=Math.max(2.5,k*.2),hy=deckY-ph+hr;
+      ctx.beginPath();ctx.arc(x,hy,hr,0,7);ctx.fill();
+      ctx.beginPath();ctx.moveTo(x,hy+hr);ctx.lineTo(x,deckY-ph*.4);ctx.moveTo(x,deckY-ph*.4);ctx.lineTo(x-k*.2,deckY);ctx.moveTo(x,deckY-ph*.4);ctx.lineTo(x+k*.2,deckY);ctx.stroke()});
+    return deckY-ph;
+  }
+  if(v.k==='bike'){
+    ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(xs[1],deckY-wr);ctx.lineTo((xs[0]+xs[1])/2,bot-wr*.8);ctx.lineTo(xs[0],deckY-wr);ctx.stroke();
+    const mx=(xs[0]+xs[1])/2;ctx.fillStyle='#334155';ctx.fillRect(mx-3,top+hh*.3,6,hh*.5);
+    ctx.beginPath();ctx.arc(mx,top+hh*.15,Math.max(3,k*.25),0,7);ctx.fill();
+  }else if(v.k==='car'){
+    ctx.fillRect(left,bot-hh*.55,right-left,hh*.55);
+    ctx.fillStyle='#e0f2fe';ctx.fillRect(left+(right-left)*.25,top,(right-left)*.45,hh*.45);
+  }else if(v.k==='cab'){
+    const cl=right-v.cab*cw;ctx.fillRect(left,top,cl-left,hh);
+    ctx.fillStyle=v.c2;ctx.fillRect(cl,top+hh*.2,right-cl,hh*.8);
+    ctx.fillStyle='#e0f2fe';ctx.fillRect(right-v.cab*cw*.45,top+hh*.3,v.cab*cw*.35,hh*.25);
+  }else if(v.k==='win'){
+    ctx.fillRect(left,top,right-left,hh);ctx.fillStyle='rgba(224,242,254,.85)';
+    const n=Math.max(1,Math.floor((right-left)/(k*1.7)));
+    for(let i=0;i<n;i++)ctx.fillRect(left+(i+.2)*(right-left)/n,top+hh*.15,(right-left)/n*.6,hh*.32);
+  }else{
+    ctx.fillRect(left,top,right-left,hh);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 14px '+FAM;ctx.fillText('P',(left+right)/2,top+hh/2);
+  }
+  ctx.fillStyle='#222';xs.forEach(x=>{ctx.beginPath();ctx.arc(x,deckY-wr,wr,0,7);ctx.fill()});
+  return top;
+}
+
+function story(ls,cu){
+  if(!ls.length)return 'Belum ada yang berada di atas jembatan, jadi di dalam jembatan belum ada gaya geser maupun momen. Tekan putar atau geser posisinya.';
+  let tot=0,RA=0;ls.forEach(l=>{tot+=l.P;RA+=l.P*(L-l.x)/L});
+  let ex=cu[0];cu.forEach(q=>{if(q.v[1]>ex.v[1])ex=q});
+  const nm=[...new Set(ls.map(l=>l.it.v.n.replace(/^\S+\s/,'')))].join(', ');
+  let s=`Di atas jembatan: ${nm} dengan total beban ${tot.toFixed(1)} kN. Tumpuan A menahan ${RA.toFixed(1)} kN dan tumpuan B menahan ${(tot-RA).toFixed(1)} kN. Momen terbesar saat ini ${ex.v[1].toFixed(1)} kN·m, terjadi pada jarak ${ex.x.toFixed(1)} m dari A.`;
+  if(S.mu>0)s+=` Karena ada pengereman, sendi A menahan gaya horizontal sehingga muncul gaya normal (tarik).`;
+  return s+' Semakin dekat beban ke tengah bentang, semakin besar momen yang dirasakan jembatan.';
+}
+
+function draw(t){
+  const fg=css('--fg'),mu=css('--muted'),ln=css('--line'),cV=css('--v'),cM=css('--m'),cN=css('--n');
+  ctx.clearRect(0,0,W,H);
+  const x0=48,x1=W-48,sx=x=>x0+x/L*(x1-x0),cw=sx(1)-sx(0);
+  const ls=loads(S.xf),cu=curve(ls),deckY=H*.19,deckH=12;
+  ctx.fillStyle=css('--cloud');
+  [[.1,.25,1],[.45,.12,1.3],[.75,.3,.8]].forEach(([a,b,s],i)=>{
+    const cx=((a*W+t*.008*(i+1))%(W+240))-120,cy=deckY*b*1.2+8;
+    [[0,0,34],[30,6,26],[-30,8,24],[8,-10,22]].forEach(([dx,dy,r])=>{ctx.beginPath();ctx.ellipse(cx+dx*s,cy+dy*s,r*s*1.3,r*s*.7,0,0,7);ctx.fill()});
+  });
+  ctx.font='12px '+FAM;ctx.textBaseline='middle';
+  ctx.fillStyle=mu;ctx.fillRect(x0,deckY,x1-x0,deckH);
+  ctx.fillStyle=fg;
+  ctx.beginPath();ctx.moveTo(x0,deckY+deckH);ctx.lineTo(x0-14,deckY+deckH+24);ctx.lineTo(x0+14,deckY+deckH+24);ctx.fill();
+  ctx.beginPath();ctx.arc(x1,deckY+deckH+10,9,0,7);ctx.fill();ctx.fillRect(x1-16,deckY+deckH+21,32,3);
+  ctx.fillStyle=mu;ctx.textAlign='center';
+  ctx.fillText('A (sendi)',x0,deckY+deckH+38);ctx.fillText('B (rol)',x1,deckY+deckH+38);ctx.fillText('L = '+L+' m',(x0+x1)/2,deckY+deckH+38);
+  const tops=new Map();items.forEach(it=>tops.set(it,drawItem(it,sx,cw,deckY)));
+  ctx.strokeStyle=cM;ctx.fillStyle=cM;ctx.lineWidth=2;ctx.textAlign='center';ctx.font='12px '+FAM;
+  let lastX=-99;
+  ls.sort((a,b)=>a.x-b.x).forEach(l=>{const X=sx(l.x),y1=tops.get(l.it)-4,y0=y1-16;
+    ctx.beginPath();ctx.moveTo(X,y0);ctx.lineTo(X,y1);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(X,y1+3);ctx.lineTo(X-4,y1-5);ctx.lineTo(X+4,y1-5);ctx.fill();
+    if(X-lastX>26){ctx.fillText(l.P.toFixed(l.P<10?1:0),X,y0-7);lastX=X}});
+
+  const pt=deckY+deckH+62,ph=(H-pt-8)/3,showEnv=$('env').checked;
+  [{t:'SFD – gaya geser (kN)',c:cV,i:0,s:sc.v,sg:1,k:'v'},{t:'BMD – momen lentur (kN·m)',c:cM,i:1,s:sc.m,sg:-1,k:'m'},{t:'NFD – gaya normal (kN)',c:cN,i:2,s:sc.n,sg:-1,k:'n'}].forEach((p,j)=>{
+    const y0=pt+j*ph+ph/2,half=ph/2-14,f=v=>y0+p.sg*(-v)/p.s*half;
+    ctx.strokeStyle=ln;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y0);ctx.stroke();
+    ctx.fillStyle=mu;ctx.textAlign='left';ctx.fillText(p.t,x0,y0-half-4);
+    if(showEnv&&env){
+      ctx.setLineDash([4,3]);ctx.strokeStyle=p.c;ctx.globalAlpha=.45;
+      (p.k==='v'?[env.vmax,env.vmin]:p.k==='m'?[env.mmax]:[env.nmax]).forEach(a=>{ctx.beginPath();XS.forEach((s,i)=>{i?ctx.lineTo(sx(s),f(a[i])):ctx.moveTo(sx(s),f(a[i]))});ctx.stroke()});
+      ctx.setLineDash([]);ctx.globalAlpha=1;
+    }
+    ctx.beginPath();ctx.moveTo(sx(0),y0);cu.forEach(q=>ctx.lineTo(sx(q.x),f(q.v[p.i])));ctx.lineTo(sx(L),y0);ctx.closePath();
+    ctx.globalAlpha=.25;ctx.fillStyle=p.c;ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=p.c;ctx.lineWidth=2;ctx.stroke();
+    let ex=cu[0];cu.forEach(q=>{if(Math.abs(q.v[p.i])>Math.abs(ex.v[p.i]))ex=q});
+    if(Math.abs(ex.v[p.i])>.05){ctx.fillStyle=p.c;ctx.textAlign='center';const yy=f(ex.v[p.i]);
+      ctx.fillText(ex.v[p.i].toFixed(1),Math.min(Math.max(sx(ex.x),x0+20),x1-20),yy+(yy<y0?-9:9))}
+  });
+  ctx.setLineDash([3,4]);ctx.strokeStyle=mu;ctx.lineWidth=1;
+  ls.forEach(l=>{ctx.beginPath();ctx.moveTo(sx(l.x),deckY+deckH);ctx.lineTo(sx(l.x),H-8);ctx.stroke()});
+  ctx.setLineDash([]);
+  let a=0,b=0,c=0,d=0;cu.forEach(q=>{a=Math.max(a,q.v[0]);b=Math.min(b,q.v[0]);c=Math.max(c,q.v[1]);d=Math.max(d,q.v[2])});
+  $('s1').textContent=a.toFixed(1)+' kN';$('s2').textContent=b.toFixed(1)+' kN';$('s3').textContent=c.toFixed(1)+' kN·m';$('s4').textContent=d.toFixed(1)+' kN';
+  $('story').textContent=story(ls,cu);
+}
+
+function labels(){
+  $('pv').textContent=S.xf.toFixed(1)+' m';$('sv').textContent=S.speed+' m/s';$('mv').textContent=Math.round(S.mu*100)+' %';
+  $('lv').textContent=L+' m';
+}
+function setRows(l){rows=l;renderRows();buildConvoy(false)}
+function setVeh(id){
+  document.querySelectorAll('.chip[data-id]').forEach(c=>c.classList.toggle('on',c.dataset.id===id));
+  setRows([{id,w:byId[id].w,gap:8}]);
+}
+function numField(t,val,fn,off){
+  const l=document.createElement('label');l.textContent=t;
+  const inp=document.createElement('input');inp.type='number';inp.step='any';inp.min=0;inp.value=off?'':val;inp.disabled=!!off;
+  inp.oninput=()=>{const v=parseFloat(inp.value);if(v>=0)fn(v)};
+  l.appendChild(inp);return l;
+}
+function renderRows(){
+  const box=$('rows');box.innerHTML='';
+  rows.forEach((r,i)=>{
+    const d=document.createElement('div');d.className='rw';
+    const sel=document.createElement('select');sel.innerHTML=VEH.map(v=>`<option value="${v.id}">${v.n}</option>`).join('');sel.value=r.id;
+    sel.onchange=()=>{r.id=sel.value;r.w=byId[r.id].w;renderRows();buildConvoy(true)};
+    const w=numField('Berat (kN)',r.w,v=>{r.w=v;buildConvoy(true)});
+    const g=numField('Jarak ke depan (m)',r.gap,v=>{r.gap=v;buildConvoy(true)},i===0);
+    const x=document.createElement('button');x.className='chip';x.textContent='✕';x.setAttribute('aria-label','Hapus beban');x.disabled=rows.length<2;
+    x.onclick=()=>{rows.splice(i,1);renderRows();buildConvoy(true)};
+    d.append(sel,w,g,x);box.appendChild(d);
+  });
+}
+$('addsel').innerHTML=VEH.map(v=>`<option value="${v.id}">${v.n}</option>`).join('');
+$('addsel').value='car';
+$('add').onclick=()=>{if(rows.length<10){const id=$('addsel').value;rows.push({id,w:byId[id].w,gap:8});renderRows();buildConvoy(true)}};
+$('mixb').onclick=()=>{document.querySelectorAll('.chip[data-id]').forEach(c=>c.classList.remove('on'));setRows(MIX.slice(0,6).map(id=>({id,w:byId[id].w,gap:8})))};
+VEH.forEach(v=>{const b=document.createElement('button');b.className='chip';b.textContent=v.n;b.dataset.id=v.id;b.onclick=()=>setVeh(v.id);$('veh').appendChild(b)});
+
+function loop(t){
+  const dt=Math.min((t-S.last)/1000||0,.05);S.last=t;
+  if(S.playing){S.xf+=S.speed*dt;if(S.xf>S.xmax)S.xf=S.xmin;$('pos').value=S.xf;labels()}
+  draw(t);requestAnimationFrame(loop);
+}
+$('pos').oninput=e=>{S.xf=+e.target.value;S.playing=false;$('play').textContent='▶ Putar';labels()};
+$('spd').oninput=e=>{S.speed=+e.target.value;labels()};
+
+
+$('L').oninput=e=>{L=+e.target.value;buildConvoy(true)};
+
+
+
+$('mu').oninput=e=>{S.mu=e.target.value/100;buildEnv();labels()};
+$('play').onclick=()=>{S.playing=!S.playing;$('play').textContent=S.playing?'⏸ Jeda':'▶ Putar'};
+addEventListener('resize',resize);
+resize();setVeh('truck');requestAnimationFrame(loop);
+</script>
+</body>
+</html>
